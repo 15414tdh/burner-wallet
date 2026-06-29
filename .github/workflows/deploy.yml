@@ -1,0 +1,47 @@
+# Continuous Deployment workflow for xdai.io
+# Deploys the burner-wallet to production when changes are pushed to master,
+# based on the LeapDAO approach (https://github.com/leapdao/burner-wallet/pull/144).
+name: Deploy to xdai.io
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:   # manual trigger for testing
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+        env:
+          CI: true
+
+      - name: Deploy to IPFS
+        uses: aquiladev/ipfs-action@v2
+        with:
+          path: ./build
+          service: pinata
+          pinataKey: ${{ secrets.PINATA_API_KEY }}
+          pinataSecret: ${{ secrets.PINATA_SECRET_KEY }}
+
+      - name: Update DNSLink
+        uses: aquiladev/dnslink-cloudflare@v1
+        with:
+          domain: xdai.io
+          record: _dnslink
+          zone: ${{ secrets.CLOUDFLARE_ZONE }}
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
